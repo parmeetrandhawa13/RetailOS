@@ -33,6 +33,8 @@ password = "ChangeMeNow123"
 
 5. Deploy.
 
+If the app was already deployed before dependency fixes, open the app settings and reboot or redeploy it after the new commit is pushed.
+
 ## Render / Procfile-based Platforms
 
 This repo includes a `Procfile`:
