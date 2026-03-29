@@ -12,11 +12,41 @@ Create `.streamlit/secrets.toml`:
 
 ```toml
 [auth]
+redirect_uri = "http://localhost:8501/oauth2callback"
+cookie_secret = "replace-with-a-long-random-string"
+
+[auth.google]
+client_id = "your-google-client-id"
+client_secret = "your-google-client-secret"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+
+[access]
+
+[[access.users]]
 username = "admin"
+name = "Retail Admin"
+role = "admin"
 password = "ChangeMeNow123"
+
+[[access.users]]
+username = "analyst"
+name = "Operations Analyst"
+role = "analyst"
+password = "Analyse123"
+
+[[access.users]]
+username = "viewer"
+name = "Business Viewer"
+role = "viewer"
+password = "Viewer123"
+
+[access.google_roles]
+admin = ["admin@example.com"]
+analyst = ["analyst@example.com"]
+viewer = ["viewer@example.com"]
 ```
 
-For production, prefer a password hash instead of a plain password.
+For production, prefer a password hash instead of a plain password. Roles supported are `admin`, `analyst`, and `viewer`. Google Sign-In is optional; local users remain as the fallback path.
 
 ## Streamlit Community Cloud
 
@@ -27,8 +57,38 @@ For production, prefer a password hash instead of a plain password.
 
 ```toml
 [auth]
+redirect_uri = "https://your-app-name.streamlit.app/oauth2callback"
+cookie_secret = "replace-with-a-long-random-string"
+
+[auth.google]
+client_id = "your-google-client-id"
+client_secret = "your-google-client-secret"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+
+[access]
+
+[[access.users]]
 username = "admin"
+name = "Retail Admin"
+role = "admin"
 password = "ChangeMeNow123"
+
+[[access.users]]
+username = "analyst"
+name = "Operations Analyst"
+role = "analyst"
+password = "Analyse123"
+
+[[access.users]]
+username = "viewer"
+name = "Business Viewer"
+role = "viewer"
+password = "Viewer123"
+
+[access.google_roles]
+admin = ["admin@example.com"]
+analyst = ["analyst@example.com"]
+viewer = ["viewer@example.com"]
 ```
 
 5. Deploy.
@@ -49,7 +109,15 @@ Set the auth secret using either:
 - environment variables:
   - `RETAILOS_AUTH_USERNAME`
   - `RETAILOS_AUTH_PASSWORD`
+  - `RETAILOS_AUTH_NAME`
+  - `RETAILOS_AUTH_ROLE`
   - or `RETAILOS_AUTH_PASSWORD_HASH`
+
+## Google Sign-In Notes
+
+- Use Streamlit's native OIDC authentication commands: `st.login()`, `st.user`, and `st.logout()`.
+- For Google Cloud, add your Streamlit callback URL to the authorized redirect URIs.
+- Keep at least one local admin account configured so you can still access the app if OAuth is misconfigured.
 
 ## Important Security Note
 

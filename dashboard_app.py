@@ -2,12 +2,16 @@ import math
 from textwrap import dedent
 from typing import Any
 
+import altair as alt
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
-from src.auth import load_auth_config, verify_credentials
+from src.auth import (
+    authenticate_local_user,
+    build_google_user,
+    google_auth_available,
+    load_access_config,
+)
 from src.retail_intelligence import (
     PIPELINE_STAGES,
     build_conversion_funnel_proxy,
@@ -484,6 +488,66 @@ def load_artifacts(source: Any):
 def _ensure_auth_state() -> None:
     st.session_state.setdefault("auth_status", False)
     st.session_state.setdefault("auth_user", "")
+    st.session_state.setdefault("auth_name", "")
+    st.session_state.setdefault("auth_role", "viewer")
+    st.session_state.setdefault("auth_source", "local")
+
+
+def _current_role() -> str:
+    return st.session_state.get("auth_role", "viewer")
+
+
+def _role_allows_upload() -> bool:
+    return _current_role() == "admin"
+
+
+def _role_allows_download() -> bool:
+    return _current_role() in {"admin", "analyst"}
+
+
+def _role_label() -> str:
+    role = _current_role()
+    return role.capitalize()
+
+
+def _streamlit_identity() -> Any:
+    return getattr(st, "user", getattr(st, "experimental_user", None))
+
+
+def _streamlit_login(provider: str) -> None:
+    if hasattr(st, "login"):
+        st.login(provider)
+        return
+    if hasattr(st, "experimental_login"):
+        st.experimental_login(provider)
+        return
+    raise RuntimeError("This Streamlit version does not support native login.")
+
+
+def _streamlit_logout() -> None:
+    if hasattr(st, "logout"):
+        st.logout()
+        return
+    if hasattr(st, "experimental_logout"):
+        st.experimental_logout()
+        return
+
+
+def _hydrate_google_session(access_config) -> bool:
+    identity = _streamlit_identity()
+    if identity is None or not getattr(identity, "is_logged_in", False):
+        return False
+
+    google_user = build_google_user(identity, access_config)
+    if google_user is None:
+        return False
+
+    st.session_state["auth_status"] = True
+    st.session_state["auth_user"] = google_user.username
+    st.session_state["auth_name"] = google_user.name
+    st.session_state["auth_role"] = google_user.role
+    st.session_state["auth_source"] = google_user.auth_source
+    return True
 
 
 def _render_auth_setup(theme: str) -> None:
@@ -531,25 +595,57 @@ def _render_auth_setup(theme: str) -> None:
             """
             # .streamlit/secrets.toml
             [auth]
+            redirect_uri = "http://localhost:8501/oauth2callback"
+            cookie_secret = "replace-with-a-long-random-string"
+
+            [auth.google]
+            client_id = "your-google-client-id"
+            client_secret = "your-google-client-secret"
+            server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+
+            [access]
+
+            [[access.users]]
             username = "admin"
+            name = "Retail Admin"
+            role = "admin"
             password = "ChangeMeNow123"
 
-            # Better option: use a hash instead of a plain password
-            # password_hash = "pbkdf2_sha256$390000$your-salt$your-base64-hash"
+            [[access.users]]
+            username = "analyst"
+            name = "Operations Analyst"
+            role = "analyst"
+            password = "Analyse123"
+
+            [[access.users]]
+            username = "viewer"
+            name = "Business Viewer"
+            role = "viewer"
+            password = "Viewer123"
+
+            [access.google_roles]
+            admin = ["admin@example.com"]
+            analyst = ["analyst@example.com"]
+            viewer = ["viewer@example.com"]
             """
         ).strip(),
         language="toml",
     )
     st.info(
         "For deployment, prefer `password_hash` instead of a plain password. "
-        "The accepted format is `pbkdf2_sha256$iterations$salt$base64hash`."
+        "Google Sign-In uses Streamlit's native OIDC flow, while local users remain available as a fallback."
     )
 
 
 def require_authentication(theme: str) -> None:
     _ensure_auth_state()
-    config = load_auth_config(st.secrets)
-    if config is None:
+    access_config = load_access_config(st.secrets)
+    google_enabled = google_auth_available(st.secrets)
+
+    if _hydrate_google_session(access_config):
+        return
+
+    if access_config is None and not google_enabled:
         _render_auth_setup(theme)
         st.stop()
 
@@ -571,19 +667,19 @@ def require_authentication(theme: str) -> None:
                 <div class="auth-kpi-grid">
                     <div class="auth-kpi">
                         <strong>Secure sign-in</strong>
-                        <span>Credential-gated session access for the dashboard</span>
+                        <span>Google Sign-In plus fallback credentials for the dashboard</span>
                     </div>
                     <div class="auth-kpi">
-                        <strong>Operational trust</strong>
-                        <span>Only authenticated users can open uploaded retail data</span>
+                        <strong>Multi-user access</strong>
+                        <span>Admins, analysts, and viewers can each have separate credentials</span>
                     </div>
                     <div class="auth-kpi">
                         <strong>India-ready reporting</strong>
                         <span>IST timestamps and lakh/crore presentation remain available after login</span>
                     </div>
                     <div class="auth-kpi">
-                        <strong>Session logout</strong>
-                        <span>Users can safely close access from the sidebar at any time</span>
+                        <strong>Role-based controls</strong>
+                        <span>Uploads and downloads can be restricted based on user responsibility</span>
                     </div>
                 </div>
             </section>
@@ -596,20 +692,29 @@ def require_authentication(theme: str) -> None:
             <section class="auth-panel">
                 <div class="mini-badge">Login</div>
                 <h3>RetailOS authentication</h3>
-                <p class="auth-lead">Use your assigned admin or operator credentials to continue.</p>
+                <p class="auth-lead">Use Google Sign-In when available, or continue with your assigned RetailOS account.</p>
             </section>
             """,
             unsafe_allow_html=True,
         )
+        if google_enabled:
+            if st.button("Continue with Google", use_container_width=True, type="primary"):
+                _streamlit_login("google")
+            st.caption("Google accounts are mapped to Admin, Analyst, or Viewer access using configured email rules.")
+            st.markdown("---")
         with st.form("retailos_login_form", clear_on_submit=False):
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Sign in", use_container_width=True, type="primary")
+            submitted = st.form_submit_button("Sign in with RetailOS account", use_container_width=True)
 
     if submitted:
-        if verify_credentials(username.strip(), password, config):
+        authenticated_user = authenticate_local_user(username.strip(), password, access_config)
+        if authenticated_user:
             st.session_state["auth_status"] = True
-            st.session_state["auth_user"] = username.strip()
+            st.session_state["auth_user"] = authenticated_user.username
+            st.session_state["auth_name"] = authenticated_user.name
+            st.session_state["auth_role"] = authenticated_user.role
+            st.session_state["auth_source"] = authenticated_user.auth_source
             st.success("Login successful. Opening RetailOS.")
             st.rerun()
         else:
@@ -620,21 +725,31 @@ def require_authentication(theme: str) -> None:
 
 def configure_runtime_controls():
     st.sidebar.markdown("## RetailOS Controls")
-    st.sidebar.caption(f"Signed in as {st.session_state.get('auth_user', 'operator')}")
+    st.sidebar.caption(
+        f"Signed in as {st.session_state.get('auth_name') or st.session_state.get('auth_user', 'operator')}"
+    )
+    st.sidebar.caption(f"Role: {_role_label()}")
+    st.sidebar.caption(f"Auth: {st.session_state.get('auth_source', 'local').capitalize()}")
     if st.sidebar.button("Logout", use_container_width=True):
+        if st.session_state.get("auth_source") == "google":
+            _streamlit_logout()
         st.session_state["auth_status"] = False
         st.session_state["auth_user"] = ""
+        st.session_state["auth_name"] = ""
+        st.session_state["auth_role"] = "viewer"
+        st.session_state["auth_source"] = "local"
         st.rerun()
-    source_mode = st.sidebar.radio(
-        "Data source",
-        options=["Project dataset", "Upload custom CSV"],
-        index=0,
-    )
+    source_options = ["Project dataset"]
+    if _role_allows_upload():
+        source_options.append("Upload custom CSV")
+    source_mode = st.sidebar.radio("Data source", options=source_options, index=0)
     uploaded_file = None
     if source_mode == "Upload custom CSV":
         uploaded_file = st.sidebar.file_uploader("Upload retail CSV", type=["csv"])
     else:
         st.sidebar.caption("Using the bundled project dataset from the workspace.")
+    if not _role_allows_upload():
+        st.sidebar.caption("CSV upload is restricted to admin users.")
     theme = st.sidebar.selectbox("Theme", options=["Light", "Dark"], index=0)
     market_view = st.sidebar.selectbox("Market view", options=["India", "Global"], index=0)
     auto_refresh = st.sidebar.toggle("Auto refresh", value=False)
@@ -668,7 +783,8 @@ def render_workspace_toolbar(runtime_controls, source: Any) -> None:
             </div>
             <div class="toolbar-copy">
                 Source: <strong>{source_label}</strong> &nbsp;|&nbsp; View: <strong>{market_label}</strong> &nbsp;|&nbsp;
-                Access: <strong>{st.session_state.get('auth_user', 'operator')}</strong>
+                User: <strong>{st.session_state.get('auth_name') or st.session_state.get('auth_user', 'operator')}</strong> &nbsp;|&nbsp;
+                Role: <strong>{_role_label()}</strong>
             </div>
         </div>
         """,
@@ -692,20 +808,23 @@ def configure_filter_controls(artifacts, market_view: str):
     selected_countries = st.sidebar.multiselect("Country", options=countries, default=default_countries)
     selected_segments = st.sidebar.multiselect("Segment", options=segments, default=segments)
 
-    st.sidebar.download_button(
-        "Download clean data",
-        artifacts.clean_data.to_csv(index=False).encode("utf-8"),
-        file_name="retailos_clean_data.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
-    st.sidebar.download_button(
-        "Download anomalies",
-        artifacts.anomalies.to_csv(index=False).encode("utf-8"),
-        file_name="retailos_anomalies.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
+    if _role_allows_download():
+        st.sidebar.download_button(
+            "Download clean data",
+            artifacts.clean_data.to_csv(index=False).encode("utf-8"),
+            file_name="retailos_clean_data.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        st.sidebar.download_button(
+            "Download anomalies",
+            artifacts.anomalies.to_csv(index=False).encode("utf-8"),
+            file_name="retailos_anomalies.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    else:
+        st.sidebar.caption("Downloads are disabled for viewer accounts.")
 
     return {
         "selected_dates": selected_dates,
@@ -1023,19 +1142,18 @@ def render_segmentation(view) -> None:
             st.info("No customer data matches the current filter set.")
         else:
             scatter_df = view["customer_features"].reset_index()
-            fig = px.scatter(
-                scatter_df,
-                x="frequency",
-                y="monetary",
-                color="segment",
-                hover_data=["CustomerID", "avg_order_value", "recency_days"],
-                color_discrete_sequence=["#287271", "#f4a261", "#e76f51"],
-                labels={"frequency": "Customer frequency", "monetary": "Monetary value"},
-                title="Segment scatter",
+            chart = (
+                alt.Chart(scatter_df)
+                .mark_circle(size=90, opacity=0.8)
+                .encode(
+                    x=alt.X("frequency:Q", title="Customer frequency"),
+                    y=alt.Y("monetary:Q", title="Monetary value"),
+                    color=alt.Color("segment:N", scale=alt.Scale(range=["#287271", "#f4a261", "#e76f51"])),
+                    tooltip=["CustomerID:N", "segment:N", "frequency:Q", "monetary:Q", "avg_order_value:Q", "recency_days:Q"],
+                )
+                .properties(height=350, title="Segment scatter")
             )
-            fig.update_traces(marker=dict(size=11, opacity=0.8))
-            fig.update_layout(margin=dict(l=20, r=20, t=48, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.altair_chart(chart, use_container_width=True)
 
     with middle:
         st.markdown("#### Segment distribution")
@@ -1043,17 +1161,17 @@ def render_segmentation(view) -> None:
             st.info("No segment distribution available.")
         else:
             dist = view["segment_distribution"].sort_values("customers", ascending=True)
-            fig = px.bar(
-                dist,
-                x="customers",
-                y="segment",
-                orientation="h",
-                color_discrete_sequence=["#287271"],
-                labels={"customers": "Customers", "segment": ""},
-                title="Customer share",
+            chart = (
+                alt.Chart(dist)
+                .mark_bar(color="#287271")
+                .encode(
+                    x=alt.X("customers:Q", title="Customers"),
+                    y=alt.Y("segment:N", sort=None, title=None),
+                    tooltip=["segment:N", "customers:Q", "revenue:Q"],
+                )
+                .properties(height=350, title="Customer share")
             )
-            fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=48, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.altair_chart(chart, use_container_width=True)
 
     with right:
         st.markdown("#### Revenue contribution")
@@ -1061,17 +1179,17 @@ def render_segmentation(view) -> None:
             st.info("No revenue contribution available.")
         else:
             revenue_dist = view["segment_distribution"].sort_values("revenue", ascending=True)
-            fig = px.bar(
-                revenue_dist,
-                x="revenue",
-                y="segment",
-                orientation="h",
-                color_discrete_sequence=["#f4a261"],
-                labels={"revenue": "Revenue", "segment": ""},
-                title="Segment revenue",
+            chart = (
+                alt.Chart(revenue_dist)
+                .mark_bar(color="#f4a261")
+                .encode(
+                    x=alt.X("revenue:Q", title="Revenue"),
+                    y=alt.Y("segment:N", sort=None, title=None),
+                    tooltip=["segment:N", "customers:Q", "revenue:Q"],
+                )
+                .properties(height=350, title="Segment revenue")
             )
-            fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=48, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.altair_chart(chart, use_container_width=True)
         st.dataframe(
             view["segment_summary"].assign(
                 customers=view["segment_summary"]["customers"].map(lambda value: format_count(value, market_view)),
@@ -1097,27 +1215,58 @@ def render_forecasting(view) -> None:
     with left:
         history = view["daily_metrics"].tail(120)
         forecast = view["forecast"]
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=history.index, y=history["revenue"], mode="lines", name="Historical sales", line=dict(color="#287271", width=3)))
-        fig.add_trace(go.Scatter(x=history.index, y=history["revenue_7d_ma"], mode="lines", name="7-day average", line=dict(color="#e76f51", width=2, dash="dash")))
-        fig.add_trace(go.Scatter(x=forecast.index, y=forecast["forecast_revenue"], mode="lines", name="ARIMA forecast", line=dict(color="#1f2a2c", width=3)))
-        fig.add_trace(go.Scatter(x=forecast.index, y=forecast["forecast_upper"], mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"))
-        fig.add_trace(go.Scatter(
-            x=forecast.index,
-            y=forecast["forecast_lower"],
-            mode="lines",
-            line=dict(width=0),
-            fill="tonexty",
-            fillcolor="rgba(233, 196, 106, 0.28)",
-            name="Confidence interval",
-        ))
-        fig.update_layout(
-            title="Sales forecast",
-            yaxis_title="Revenue",
-            margin=dict(l=20, r=20, t=48, b=20),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        history_df = history.reset_index().rename(columns={"index": "OrderDate"})
+        forecast_df = forecast.reset_index().rename(columns={"index": "OrderDate"})
+        historical_chart = (
+            alt.Chart(history_df)
+            .transform_fold(
+                ["revenue", "revenue_7d_ma"],
+                as_=["series", "value"],
+            )
+            .mark_line(strokeWidth=3)
+            .encode(
+                x=alt.X("OrderDate:T", title=None),
+                y=alt.Y("value:Q", title="Revenue"),
+                color=alt.Color(
+                    "series:N",
+                    scale=alt.Scale(
+                        domain=["revenue", "revenue_7d_ma"],
+                        range=["#287271", "#e76f51"],
+                    ),
+                    title=None,
+                ),
+                strokeDash=alt.StrokeDash(
+                    "series:N",
+                    scale=alt.Scale(
+                        domain=["revenue", "revenue_7d_ma"],
+                        range=[[1, 0], [6, 4]],
+                    ),
+                    title=None,
+                ),
+                tooltip=["OrderDate:T", "series:N", "value:Q"],
+            )
         )
-        st.plotly_chart(fig, use_container_width=True)
+        interval_chart = (
+            alt.Chart(forecast_df)
+            .mark_area(color="#e9c46a", opacity=0.25)
+            .encode(
+                x="OrderDate:T",
+                y=alt.Y("forecast_lower:Q", title="Revenue"),
+                y2="forecast_upper:Q",
+                tooltip=["OrderDate:T", "forecast_lower:Q", "forecast_upper:Q"],
+            )
+        )
+        forecast_line = (
+            alt.Chart(forecast_df)
+            .mark_line(color="#1f2a2c", strokeWidth=3)
+            .encode(
+                x="OrderDate:T",
+                y="forecast_revenue:Q",
+                tooltip=["OrderDate:T", "forecast_revenue:Q"],
+            )
+        )
+        chart = (interval_chart + historical_chart + forecast_line).properties(height=360, title="Sales forecast")
+        st.altair_chart(chart, use_container_width=True)
 
     with right:
         st.markdown("#### Forecast quality")
@@ -1163,23 +1312,25 @@ def render_funnel_and_alerts(view) -> None:
                 ordered=True,
             )
             funnel_sorted = funnel_sorted.sort_values("stage", ascending=False)
-            fig = px.bar(
-                funnel_sorted,
-                x="value",
-                y="stage",
-                orientation="h",
-                color="stage",
-                color_discrete_map={
-                    "Visitors": "#d9b44a",
-                    "Product Views": "#f4a261",
-                    "Cart": "#e76f51",
-                    "Purchase": "#287271",
-                },
-                labels={"value": "Volume", "stage": ""},
-                title="Modeled funnel",
+            chart = (
+                alt.Chart(funnel_sorted)
+                .mark_bar()
+                .encode(
+                    x=alt.X("value:Q", title="Volume"),
+                    y=alt.Y("stage:N", sort=None, title=None),
+                    color=alt.Color(
+                        "stage:N",
+                        scale=alt.Scale(
+                            domain=["Visitors", "Product Views", "Cart", "Purchase"],
+                            range=["#d9b44a", "#f4a261", "#e76f51", "#287271"],
+                        ),
+                        legend=None,
+                    ),
+                    tooltip=["stage:N", "value:Q"],
+                )
+                .properties(height=300, title="Modeled funnel")
             )
-            fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=48, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.altair_chart(chart, use_container_width=True)
 
             purchase_value = max(int(funnel.loc[funnel["stage"] == "Purchase", "value"].iloc[0]), 1)
             visitor_value = max(int(funnel.loc[funnel["stage"] == "Visitors", "value"].iloc[0]), 1)
@@ -1265,17 +1416,17 @@ def render_health_and_geography(view) -> None:
             st.info("No country summary is available for the selected filters.")
         else:
             countries = view["country_summary"].head(8).iloc[::-1]
-            fig = px.bar(
-                countries,
-                x="revenue",
-                y="Country",
-                orientation="h",
-                color_discrete_sequence=["#f4a261"],
-                labels={"revenue": "Revenue", "Country": ""},
-                title="Top revenue markets",
+            chart = (
+                alt.Chart(countries)
+                .mark_bar(color="#f4a261")
+                .encode(
+                    x=alt.X("revenue:Q", title="Revenue"),
+                    y=alt.Y("Country:N", sort=None, title=None),
+                    tooltip=["Country:N", "orders:Q", "customers:Q", "revenue:Q", "avg_order_value:Q"],
+                )
+                .properties(height=360, title="Top revenue markets")
             )
-            fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=48, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.altair_chart(chart, use_container_width=True)
             country_table = view["country_summary"].copy()
             country_table["orders"] = country_table["orders"].map(lambda value: format_count(value, market_view))
             country_table["customers"] = country_table["customers"].map(lambda value: format_count(value, market_view))

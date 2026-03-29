@@ -1,0 +1,36 @@
+[auth]
+redirect_uri = "http://localhost:8501/oauth2callback"
+cookie_secret = "replace-with-a-long-random-string"
+
+[auth.google]
+client_id = "your-google-client-id"
+client_secret = "your-google-client-secret"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+
+[access]
+
+[[access.users]]
+username = "admin"
+name = "Retail Admin"
+role = "admin"
+password = "ChangeMeNow123"
+
+[[access.users]]
+username = "analyst"
+name = "Operations Analyst"
+role = "analyst"
+password = "Analyse123"
+
+[[access.users]]
+username = "viewer"
+name = "Business Viewer"
+role = "viewer"
+password = "Viewer123"
+
+[access.google_roles]
+admin = ["admin@example.com"]
+analyst = ["analyst@example.com"]
+viewer = ["viewer@example.com"]
+
+# Prefer password hashes for deployment:
+# password_hash = "pbkdf2_sha256$390000$your-salt$your-base64-hash"
