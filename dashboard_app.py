@@ -2,9 +2,9 @@ import math
 from textwrap import dedent
 from typing import Any
 
-import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from src.auth import load_auth_config, verify_credentials
@@ -1022,24 +1022,20 @@ def render_segmentation(view) -> None:
         if view["customer_features"].empty:
             st.info("No customer data matches the current filter set.")
         else:
-            fig, ax = plt.subplots(figsize=(6.8, 4.8))
-            categories = view["customer_features"]["segment"].astype("category")
-            scatter = ax.scatter(
-                view["customer_features"]["frequency"],
-                view["customer_features"]["monetary"],
-                c=categories.cat.codes,
-                cmap="Set2",
-                alpha=0.78,
-                s=52,
-                edgecolors="none",
+            scatter_df = view["customer_features"].reset_index()
+            fig = px.scatter(
+                scatter_df,
+                x="frequency",
+                y="monetary",
+                color="segment",
+                hover_data=["CustomerID", "avg_order_value", "recency_days"],
+                color_discrete_sequence=["#287271", "#f4a261", "#e76f51"],
+                labels={"frequency": "Customer frequency", "monetary": "Monetary value"},
+                title="Segment scatter",
             )
-            ax.set_xlabel("Customer frequency")
-            ax.set_ylabel("Monetary value")
-            ax.set_title("Segment scatter")
-            ax.grid(alpha=0.18)
-            handles, _ = scatter.legend_elements()
-            ax.legend(handles, categories.cat.categories, frameon=False, loc="upper left")
-            st.pyplot(fig, use_container_width=True)
+            fig.update_traces(marker=dict(size=11, opacity=0.8))
+            fig.update_layout(margin=dict(l=20, r=20, t=48, b=20))
+            st.plotly_chart(fig, use_container_width=True)
 
     with middle:
         st.markdown("#### Segment distribution")
@@ -1047,12 +1043,17 @@ def render_segmentation(view) -> None:
             st.info("No segment distribution available.")
         else:
             dist = view["segment_distribution"].sort_values("customers", ascending=True)
-            fig, ax = plt.subplots(figsize=(5.1, 4.8))
-            ax.barh(dist["segment"], dist["customers"], color="#287271")
-            ax.set_xlabel("Customers")
-            ax.set_title("Customer share")
-            ax.grid(axis="x", alpha=0.18)
-            st.pyplot(fig, use_container_width=True)
+            fig = px.bar(
+                dist,
+                x="customers",
+                y="segment",
+                orientation="h",
+                color_discrete_sequence=["#287271"],
+                labels={"customers": "Customers", "segment": ""},
+                title="Customer share",
+            )
+            fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=48, b=20))
+            st.plotly_chart(fig, use_container_width=True)
 
     with right:
         st.markdown("#### Revenue contribution")
@@ -1060,12 +1061,17 @@ def render_segmentation(view) -> None:
             st.info("No revenue contribution available.")
         else:
             revenue_dist = view["segment_distribution"].sort_values("revenue", ascending=True)
-            fig, ax = plt.subplots(figsize=(5.1, 4.8))
-            ax.barh(revenue_dist["segment"], revenue_dist["revenue"], color="#f4a261")
-            ax.set_xlabel("Revenue")
-            ax.set_title("Segment revenue")
-            ax.grid(axis="x", alpha=0.18)
-            st.pyplot(fig, use_container_width=True)
+            fig = px.bar(
+                revenue_dist,
+                x="revenue",
+                y="segment",
+                orientation="h",
+                color_discrete_sequence=["#f4a261"],
+                labels={"revenue": "Revenue", "segment": ""},
+                title="Segment revenue",
+            )
+            fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=48, b=20))
+            st.plotly_chart(fig, use_container_width=True)
         st.dataframe(
             view["segment_summary"].assign(
                 customers=view["segment_summary"]["customers"].map(lambda value: format_count(value, market_view)),
@@ -1089,27 +1095,29 @@ def render_forecasting(view) -> None:
     market_view = view["market_view"]
 
     with left:
-        fig, ax = plt.subplots(figsize=(9.4, 4.8))
         history = view["daily_metrics"].tail(120)
         forecast = view["forecast"]
-        ax.plot(history.index, history["revenue"], color="#287271", linewidth=2.2, label="Historical sales")
-        ax.plot(history.index, history["revenue_7d_ma"], color="#e76f51", linewidth=2, linestyle="--", label="7-day average")
-        ax.plot(forecast.index, forecast["forecast_revenue"], color="#1f2a2c", linewidth=2.4, label="ARIMA forecast")
-        ax.fill_between(
-            forecast.index,
-            forecast["forecast_lower"],
-            forecast["forecast_upper"],
-            color="#e9c46a",
-            alpha=0.25,
-            label="Confidence interval",
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=history.index, y=history["revenue"], mode="lines", name="Historical sales", line=dict(color="#287271", width=3)))
+        fig.add_trace(go.Scatter(x=history.index, y=history["revenue_7d_ma"], mode="lines", name="7-day average", line=dict(color="#e76f51", width=2, dash="dash")))
+        fig.add_trace(go.Scatter(x=forecast.index, y=forecast["forecast_revenue"], mode="lines", name="ARIMA forecast", line=dict(color="#1f2a2c", width=3)))
+        fig.add_trace(go.Scatter(x=forecast.index, y=forecast["forecast_upper"], mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"))
+        fig.add_trace(go.Scatter(
+            x=forecast.index,
+            y=forecast["forecast_lower"],
+            mode="lines",
+            line=dict(width=0),
+            fill="tonexty",
+            fillcolor="rgba(233, 196, 106, 0.28)",
+            name="Confidence interval",
+        ))
+        fig.update_layout(
+            title="Sales forecast",
+            yaxis_title="Revenue",
+            margin=dict(l=20, r=20, t=48, b=20),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
         )
-        ax.set_title("Sales forecast")
-        ax.set_ylabel("Revenue")
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
-        ax.grid(alpha=0.18)
-        ax.legend(frameon=False, ncol=4, loc="upper left")
-        fig.autofmt_xdate()
-        st.pyplot(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
 
     with right:
         st.markdown("#### Forecast quality")
@@ -1148,7 +1156,6 @@ def render_funnel_and_alerts(view) -> None:
         if funnel.empty:
             st.info("No funnel data available.")
         else:
-            fig, ax = plt.subplots(figsize=(6.2, 4.6))
             funnel_sorted = funnel.copy()
             funnel_sorted["stage"] = pd.Categorical(
                 funnel_sorted["stage"],
@@ -1156,15 +1163,23 @@ def render_funnel_and_alerts(view) -> None:
                 ordered=True,
             )
             funnel_sorted = funnel_sorted.sort_values("stage", ascending=False)
-            ax.barh(
-                funnel_sorted["stage"],
-                funnel_sorted["value"],
-                color=["#d9b44a", "#f4a261", "#e76f51", "#287271"],
+            fig = px.bar(
+                funnel_sorted,
+                x="value",
+                y="stage",
+                orientation="h",
+                color="stage",
+                color_discrete_map={
+                    "Visitors": "#d9b44a",
+                    "Product Views": "#f4a261",
+                    "Cart": "#e76f51",
+                    "Purchase": "#287271",
+                },
+                labels={"value": "Volume", "stage": ""},
+                title="Modeled funnel",
             )
-            ax.set_title("Modeled funnel")
-            ax.set_xlabel("Volume")
-            ax.grid(axis="x", alpha=0.18)
-            st.pyplot(fig, use_container_width=True)
+            fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=48, b=20))
+            st.plotly_chart(fig, use_container_width=True)
 
             purchase_value = max(int(funnel.loc[funnel["stage"] == "Purchase", "value"].iloc[0]), 1)
             visitor_value = max(int(funnel.loc[funnel["stage"] == "Visitors", "value"].iloc[0]), 1)
@@ -1249,13 +1264,18 @@ def render_health_and_geography(view) -> None:
         if view["country_summary"].empty:
             st.info("No country summary is available for the selected filters.")
         else:
-            fig, ax = plt.subplots(figsize=(8.8, 5.2))
             countries = view["country_summary"].head(8).iloc[::-1]
-            ax.barh(countries["Country"], countries["revenue"], color="#f4a261")
-            ax.set_xlabel("Revenue")
-            ax.set_title("Top revenue markets")
-            ax.grid(axis="x", alpha=0.18)
-            st.pyplot(fig, use_container_width=True)
+            fig = px.bar(
+                countries,
+                x="revenue",
+                y="Country",
+                orientation="h",
+                color_discrete_sequence=["#f4a261"],
+                labels={"revenue": "Revenue", "Country": ""},
+                title="Top revenue markets",
+            )
+            fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=48, b=20))
+            st.plotly_chart(fig, use_container_width=True)
             country_table = view["country_summary"].copy()
             country_table["orders"] = country_table["orders"].map(lambda value: format_count(value, market_view))
             country_table["customers"] = country_table["customers"].map(lambda value: format_count(value, market_view))
