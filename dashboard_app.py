@@ -184,6 +184,11 @@ def inject_styles(theme: str) -> None:
                 font-size: 0.92rem;
             }}
 
+            div[data-testid="stFormSubmitButton"] button {{
+                color: #fff8ef !important;
+                font-weight: 700;
+            }}
+
             .hero {{
                 padding: 1.7rem 1.9rem;
                 border-radius: 28px;
@@ -653,6 +658,11 @@ def require_authentication(theme: str) -> None:
         return
 
     inject_styles(theme)
+    auth_copy = (
+        "Use Google Sign-In when available, or continue with your assigned RetailOS account."
+        if google_enabled
+        else "Use your assigned RetailOS account to continue."
+    )
     left, right = st.columns([1.15, 0.9], gap="large")
     with left:
         st.markdown(
@@ -688,11 +698,11 @@ def require_authentication(theme: str) -> None:
         )
     with right:
         st.markdown(
-            """
+            f"""
             <section class="auth-panel">
                 <div class="mini-badge">Login</div>
                 <h3>RetailOS authentication</h3>
-                <p class="auth-lead">Use Google Sign-In when available, or continue with your assigned RetailOS account.</p>
+                <p class="auth-lead">{auth_copy}</p>
             </section>
             """,
             unsafe_allow_html=True,
