@@ -184,9 +184,87 @@ def inject_styles(theme: str) -> None:
                 font-size: 0.92rem;
             }}
 
+            div[data-testid="stTextInput"] label p,
+            div[data-testid="stTextInput"] label,
+            div[data-testid="stTextInputRootElement"] label p,
+            div[data-testid="stTextInputRootElement"] label,
+            div[data-testid="stTextInput"] p,
+            div[data-testid="stTextInputRootElement"] p,
+            div[data-testid="stTextInput"] span,
+            div[data-testid="stTextInputRootElement"] span {{
+                color: var(--ink) !important;
+                opacity: 1 !important;
+                font-weight: 600;
+            }}
+
+            div[data-testid="stButton"] button:disabled,
+            div[data-testid="stButton"] button:disabled p,
+            div[data-testid="stButton"] button:disabled span {{
+                color: var(--muted) !important;
+                opacity: 1 !important;
+            }}
+
             div[data-testid="stFormSubmitButton"] button {{
                 color: #fff8ef !important;
                 font-weight: 700;
+            }}
+
+            .workspace-hero {{
+                margin: 0 0 1rem;
+                padding: 1.25rem 1.3rem;
+                border-radius: 24px;
+                background: linear-gradient(135deg, color-mix(in srgb, var(--paper) 82%, var(--teal) 18%), var(--paper));
+                border: 1px solid var(--line);
+                box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
+            }}
+
+            .workspace-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 0.8rem;
+                margin-top: 1rem;
+            }}
+
+            .workspace-card {{
+                padding: 0.95rem 1rem;
+                border-radius: 18px;
+                background: var(--paper);
+                border: 1px solid var(--line);
+                min-height: 132px;
+                box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+            }}
+
+            .workspace-card.active {{
+                border-color: color-mix(in srgb, var(--accent) 56%, var(--line));
+                box-shadow: 0 16px 30px rgba(231, 111, 81, 0.14);
+            }}
+
+            .workspace-icon {{
+                width: 42px;
+                height: 42px;
+                border-radius: 14px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-family: "Space Grotesk", sans-serif;
+                font-size: 0.9rem;
+                letter-spacing: 0.06em;
+                background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+                color: #fff8ef;
+                margin-bottom: 0.7rem;
+            }}
+
+            .workspace-title {{
+                font-family: "Space Grotesk", sans-serif;
+                font-size: 1rem;
+                color: var(--ink);
+                margin-bottom: 0.25rem;
+            }}
+
+            .workspace-copy {{
+                color: var(--muted);
+                font-size: 0.88rem;
+                line-height: 1.45;
             }}
 
             .hero {{
@@ -712,7 +790,8 @@ def require_authentication(theme: str) -> None:
                 _streamlit_login("google")
             st.caption("Google accounts are mapped to Admin, Analyst, or Viewer access using configured email rules.")
         else:
-            st.button("Continue with Google", use_container_width=True, disabled=True)
+            if st.button("Continue with Google", use_container_width=True):
+                st.info("Google Sign-In is part of RetailOS, but this deployment is not configured for Google OAuth yet.")
             st.caption("Google Sign-In is available in RetailOS but is not configured for this deployment yet.")
         st.markdown("---")
         with st.form("retailos_login_form", clear_on_submit=False):
@@ -815,6 +894,47 @@ def render_workspace_toolbar(runtime_controls, source: Any) -> None:
                 Role: <strong>{_role_label()}</strong>
             </div>
         </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_workspace_hero(page_name: str) -> None:
+    sections = [
+        ("OV", "Overview", "Executive snapshot of retail performance, health, and direction."),
+        ("CS", "CSV Summary", "Fast quality check of rows, columns, missing values, and sample data."),
+        ("PL", "Pipeline", "See how RetailOS moves from raw transactions to decisions."),
+        ("IC", "Ingestion & Cleaning", "Validate the source file and understand what was cleaned out."),
+        ("SG", "Segmentation", "Explore customer groups, commercial value, and engagement patterns."),
+        ("FC", "Forecasting", "Inspect demand outlook, reliability, and near-term trading signals."),
+        ("AR", "Alerts & Recommendations", "Review anomalies, funnel signals, and suggested actions."),
+        ("HG", "Health & Geography", "Check operating health and where revenue concentration is strongest."),
+    ]
+    cards_markup = []
+    for icon, title, copy in sections:
+        active_class = " active" if title == page_name else ""
+        cards_markup.append(
+            f"""
+            <div class="workspace-card{active_class}">
+                <div class="workspace-icon">{icon}</div>
+                <div class="workspace-title">{title}</div>
+                <div class="workspace-copy">{copy}</div>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f"""
+        <section class="workspace-hero">
+            <div class="hero-kicker">RetailOS workspace navigator</div>
+            <h2 style="margin:0;">Analyse your retail data page by page.</h2>
+            <p class="section-copy" style="margin-top:0.7rem; margin-bottom:0;">
+                Use the sidebar page switch to move between business views. The highlighted card shows the current workspace section.
+            </p>
+            <div class="workspace-grid">
+                {''.join(cards_markup)}
+            </div>
+        </section>
         """,
         unsafe_allow_html=True,
     )
@@ -1219,6 +1339,18 @@ def render_quick_csv_summary(artifacts, view) -> None:
         st.markdown("#### Missing values")
         st.dataframe(missing_df.sort_values("Missing values", ascending=False), use_container_width=True, hide_index=True)
 
+        missing_chart = (
+            alt.Chart(missing_df.sort_values("Missing values", ascending=False).head(8))
+            .mark_bar(color="#e76f51")
+            .encode(
+                x=alt.X("Missing values:Q", title="Missing values"),
+                y=alt.Y("Column:N", sort="-x", title=None),
+                tooltip=["Column:N", "Missing values:Q", "Missing %:Q"],
+            )
+            .properties(height=240, title="Top missing columns")
+        )
+        st.altair_chart(missing_chart, use_container_width=True)
+
     with right:
         st.markdown("#### Column explorer")
         selected_column = st.selectbox("Inspect a column", options=artifacts.raw_data.columns.tolist())
@@ -1247,6 +1379,27 @@ def render_quick_csv_summary(artifacts, view) -> None:
                 }
             )
         st.dataframe(stats_df, use_container_width=True, hide_index=True)
+
+        if "InvoiceDate" in artifacts.raw_data.columns:
+            volume_df = artifacts.clean_data.copy()
+            volume_df["OrderDate"] = pd.to_datetime(volume_df["OrderDate"])
+            volume_df = (
+                volume_df.groupby("OrderDate")
+                .agg(revenue=("Revenue", "sum"))
+                .reset_index()
+                .tail(45)
+            )
+            trend_chart = (
+                alt.Chart(volume_df)
+                .mark_area(line={"color": "#287271"}, color="#70c1b3", opacity=0.35)
+                .encode(
+                    x=alt.X("OrderDate:T", title=None),
+                    y=alt.Y("revenue:Q", title="Revenue"),
+                    tooltip=["OrderDate:T", "revenue:Q"],
+                )
+                .properties(height=220, title="Recent revenue trend")
+            )
+            st.altair_chart(trend_chart, use_container_width=True)
 
         st.markdown("#### Data preview")
         st.dataframe(artifacts.raw_data.head(preview_rows), use_container_width=True, hide_index=True)
@@ -1561,94 +1714,59 @@ def render_health_and_geography(view) -> None:
 
 
 def render_workspace_page(page_name: str, artifacts, view) -> None:
+    derived_runtime = {
+        "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+        "market_view": view["market_view"],
+    }
     if page_name == "Overview":
-        render_workspace_toolbar(
-            {
-                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
-                "market_view": view["market_view"],
-            },
-            artifacts.ingestion_summary["source"],
-        )
+        render_workspace_toolbar(derived_runtime, artifacts.ingestion_summary["source"])
         render_header(artifacts, view)
         st.write("")
         render_metric_cards(view)
+        st.write("")
+        render_workspace_hero(page_name)
         st.write("")
         render_quick_csv_summary(artifacts, view)
         return
 
     if page_name == "CSV Summary":
-        render_workspace_toolbar(
-            {
-                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
-                "market_view": view["market_view"],
-            },
-            artifacts.ingestion_summary["source"],
-        )
+        render_workspace_toolbar(derived_runtime, artifacts.ingestion_summary["source"])
+        render_workspace_hero(page_name)
         render_quick_csv_summary(artifacts, view)
         return
 
     if page_name == "Pipeline":
-        render_workspace_toolbar(
-            {
-                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
-                "market_view": view["market_view"],
-            },
-            artifacts.ingestion_summary["source"],
-        )
+        render_workspace_toolbar(derived_runtime, artifacts.ingestion_summary["source"])
+        render_workspace_hero(page_name)
         render_pipeline()
         return
 
     if page_name == "Ingestion & Cleaning":
-        render_workspace_toolbar(
-            {
-                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
-                "market_view": view["market_view"],
-            },
-            artifacts.ingestion_summary["source"],
-        )
+        render_workspace_toolbar(derived_runtime, artifacts.ingestion_summary["source"])
+        render_workspace_hero(page_name)
         render_data_engine(artifacts, view["market_view"])
         return
 
     if page_name == "Segmentation":
-        render_workspace_toolbar(
-            {
-                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
-                "market_view": view["market_view"],
-            },
-            artifacts.ingestion_summary["source"],
-        )
+        render_workspace_toolbar(derived_runtime, artifacts.ingestion_summary["source"])
+        render_workspace_hero(page_name)
         render_segmentation(view)
         return
 
     if page_name == "Forecasting":
-        render_workspace_toolbar(
-            {
-                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
-                "market_view": view["market_view"],
-            },
-            artifacts.ingestion_summary["source"],
-        )
+        render_workspace_toolbar(derived_runtime, artifacts.ingestion_summary["source"])
+        render_workspace_hero(page_name)
         render_forecasting(view)
         return
 
     if page_name == "Alerts & Recommendations":
-        render_workspace_toolbar(
-            {
-                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
-                "market_view": view["market_view"],
-            },
-            artifacts.ingestion_summary["source"],
-        )
+        render_workspace_toolbar(derived_runtime, artifacts.ingestion_summary["source"])
+        render_workspace_hero(page_name)
         render_funnel_and_alerts(view)
         return
 
-    render_workspace_toolbar(
-        {
-            "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
-            "market_view": view["market_view"],
-        },
-        artifacts.ingestion_summary["source"],
-    )
+    render_workspace_toolbar(derived_runtime, artifacts.ingestion_summary["source"])
+    render_workspace_hero(page_name)
     render_health_and_geography(view)
 
 
