@@ -711,7 +711,10 @@ def require_authentication(theme: str) -> None:
             if st.button("Continue with Google", use_container_width=True, type="primary"):
                 _streamlit_login("google")
             st.caption("Google accounts are mapped to Admin, Analyst, or Viewer access using configured email rules.")
-            st.markdown("---")
+        else:
+            st.button("Continue with Google", use_container_width=True, disabled=True)
+            st.caption("Google Sign-In is available in RetailOS but is not configured for this deployment yet.")
+        st.markdown("---")
         with st.form("retailos_login_form", clear_on_submit=False):
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
@@ -762,6 +765,20 @@ def configure_runtime_controls():
         st.sidebar.caption("CSV upload is restricted to admin users.")
     theme = st.sidebar.selectbox("Theme", options=["Light", "Dark"], index=0)
     market_view = st.sidebar.selectbox("Market view", options=["India", "Global"], index=0)
+    workspace_page = st.sidebar.radio(
+        "Workspace page",
+        options=[
+            "Overview",
+            "CSV Summary",
+            "Pipeline",
+            "Ingestion & Cleaning",
+            "Segmentation",
+            "Forecasting",
+            "Alerts & Recommendations",
+            "Health & Geography",
+        ],
+        index=0,
+    )
     auto_refresh = st.sidebar.toggle("Auto refresh", value=False)
     refresh_seconds = st.sidebar.slider("Refresh interval (sec)", 15, 300, 60, 15)
     if market_view == "India":
@@ -778,6 +795,7 @@ def configure_runtime_controls():
         "uploaded_file": uploaded_file,
         "theme": theme,
         "market_view": market_view,
+        "workspace_page": workspace_page,
     }
 
 
@@ -1137,6 +1155,103 @@ def render_data_engine(artifacts, market_view: str) -> None:
         st.dataframe(cleaning_df, use_container_width=True, hide_index=True)
 
 
+def render_quick_csv_summary(artifacts, view) -> None:
+    market_view = view["market_view"]
+    st.markdown("## Quick CSV Summary")
+    st.markdown(
+        '<p class="section-copy">This page gives a fast read on the uploaded or bundled retail file before you go deep into forecasting and segmentation.</p>',
+        unsafe_allow_html=True,
+    )
+
+    summary_cols = st.columns(4)
+    summary_cards = [
+        ("Rows loaded", format_count(artifacts.ingestion_summary["rows_loaded"], market_view)),
+        ("Clean rows", format_count(artifacts.cleaning_summary["clean_rows"], market_view)),
+        ("Columns", format_count(artifacts.ingestion_summary["columns_loaded"], market_view)),
+        ("Countries", format_count(artifacts.ingestion_summary["countries"], market_view)),
+    ]
+    for column, (label, value) in zip(summary_cols, summary_cards):
+        with column:
+            st.markdown(
+                f"""
+                <div class="metric-card">
+                    <div class="metric-label">{label}</div>
+                    <div class="metric-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    left, right = st.columns([0.9, 1.1])
+    with left:
+        st.markdown("#### File snapshot")
+        snapshot_df = pd.DataFrame(
+            {
+                "Metric": [
+                    "Source",
+                    "Encoding",
+                    "Delimiter",
+                    "Date min",
+                    "Date max",
+                    "Active customers",
+                    "Orders",
+                ],
+                "Value": [
+                    artifacts.ingestion_summary["source"],
+                    artifacts.ingestion_summary["encoding_used"],
+                    artifacts.ingestion_summary["delimiter_used"],
+                    artifacts.ingestion_summary["date_min"],
+                    artifacts.ingestion_summary["date_max"],
+                    format_count(view["kpis"]["total_customers"], market_view),
+                    format_count(view["kpis"]["total_orders"], market_view),
+                ],
+            }
+        )
+        st.dataframe(snapshot_df, use_container_width=True, hide_index=True)
+
+        missing_df = (
+            artifacts.raw_data.isna()
+            .sum()
+            .reset_index()
+            .rename(columns={"index": "Column", 0: "Missing values"})
+        )
+        missing_df["Missing %"] = missing_df["Missing values"].div(max(len(artifacts.raw_data), 1)).mul(100).round(1)
+        st.markdown("#### Missing values")
+        st.dataframe(missing_df.sort_values("Missing values", ascending=False), use_container_width=True, hide_index=True)
+
+    with right:
+        st.markdown("#### Column explorer")
+        selected_column = st.selectbox("Inspect a column", options=artifacts.raw_data.columns.tolist())
+        preview_rows = st.slider("Preview rows", min_value=5, max_value=30, value=10, step=5)
+        column_series = artifacts.raw_data[selected_column]
+
+        if pd.api.types.is_numeric_dtype(column_series):
+            stats_df = pd.DataFrame(
+                {
+                    "Metric": ["Count", "Mean", "Median", "Min", "Max"],
+                    "Value": [
+                        int(column_series.count()),
+                        round(float(column_series.mean()), 2) if column_series.count() else "N/A",
+                        round(float(column_series.median()), 2) if column_series.count() else "N/A",
+                        round(float(column_series.min()), 2) if column_series.count() else "N/A",
+                        round(float(column_series.max()), 2) if column_series.count() else "N/A",
+                    ],
+                }
+            )
+        else:
+            top_values = column_series.fillna("Missing").astype(str).value_counts().head(5)
+            stats_df = pd.DataFrame(
+                {
+                    "Value": top_values.index,
+                    "Count": top_values.values,
+                }
+            )
+        st.dataframe(stats_df, use_container_width=True, hide_index=True)
+
+        st.markdown("#### Data preview")
+        st.dataframe(artifacts.raw_data.head(preview_rows), use_container_width=True, hide_index=True)
+
+
 def render_segmentation(view) -> None:
     st.markdown("## Customer Segmentation Engine")
     st.markdown(
@@ -1445,6 +1560,98 @@ def render_health_and_geography(view) -> None:
             st.dataframe(country_table, use_container_width=True, hide_index=True)
 
 
+def render_workspace_page(page_name: str, artifacts, view) -> None:
+    if page_name == "Overview":
+        render_workspace_toolbar(
+            {
+                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+                "market_view": view["market_view"],
+            },
+            artifacts.ingestion_summary["source"],
+        )
+        render_header(artifacts, view)
+        st.write("")
+        render_metric_cards(view)
+        st.write("")
+        render_quick_csv_summary(artifacts, view)
+        return
+
+    if page_name == "CSV Summary":
+        render_workspace_toolbar(
+            {
+                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+                "market_view": view["market_view"],
+            },
+            artifacts.ingestion_summary["source"],
+        )
+        render_quick_csv_summary(artifacts, view)
+        return
+
+    if page_name == "Pipeline":
+        render_workspace_toolbar(
+            {
+                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+                "market_view": view["market_view"],
+            },
+            artifacts.ingestion_summary["source"],
+        )
+        render_pipeline()
+        return
+
+    if page_name == "Ingestion & Cleaning":
+        render_workspace_toolbar(
+            {
+                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+                "market_view": view["market_view"],
+            },
+            artifacts.ingestion_summary["source"],
+        )
+        render_data_engine(artifacts, view["market_view"])
+        return
+
+    if page_name == "Segmentation":
+        render_workspace_toolbar(
+            {
+                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+                "market_view": view["market_view"],
+            },
+            artifacts.ingestion_summary["source"],
+        )
+        render_segmentation(view)
+        return
+
+    if page_name == "Forecasting":
+        render_workspace_toolbar(
+            {
+                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+                "market_view": view["market_view"],
+            },
+            artifacts.ingestion_summary["source"],
+        )
+        render_forecasting(view)
+        return
+
+    if page_name == "Alerts & Recommendations":
+        render_workspace_toolbar(
+            {
+                "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+                "market_view": view["market_view"],
+            },
+            artifacts.ingestion_summary["source"],
+        )
+        render_funnel_and_alerts(view)
+        return
+
+    render_workspace_toolbar(
+        {
+            "source_mode": "Upload custom CSV" if artifacts.ingestion_summary["source"] != "data/retail.csv" else "Project dataset",
+            "market_view": view["market_view"],
+        },
+        artifacts.ingestion_summary["source"],
+    )
+    render_health_and_geography(view)
+
+
 def main() -> None:
     require_authentication(theme="Light")
     runtime_controls = configure_runtime_controls()
@@ -1472,22 +1679,7 @@ def main() -> None:
     inject_styles(runtime_controls["theme"])
     view = build_filtered_view(artifacts, controls)
 
-    render_workspace_toolbar(runtime_controls, source)
-    render_header(artifacts, view)
-    st.write("")
-    render_metric_cards(view)
-    st.write("")
-    render_pipeline()
-    st.write("")
-    render_data_engine(artifacts, view["market_view"])
-    st.write("")
-    render_segmentation(view)
-    st.write("")
-    render_forecasting(view)
-    st.write("")
-    render_funnel_and_alerts(view)
-    st.write("")
-    render_health_and_geography(view)
+    render_workspace_page(runtime_controls["workspace_page"], artifacts, view)
 
 
 if __name__ == "__main__":
