@@ -8,8 +8,6 @@ import streamlit as st
 
 from src.auth import (
     authenticate_local_user,
-    build_google_user,
-    google_auth_available,
     load_access_config,
 )
 from src.retail_intelligence import (
@@ -66,440 +64,442 @@ def inject_styles(theme: str) -> None:
         """
 
     st.markdown(
-        f"""
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap');
+        dedent(
+            f"""
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap');
 
-            :root {{
-                {css_variables}
-            }}
-
-            .stApp {{
-                background:
-                    radial-gradient(circle at top left, rgba(233, 196, 106, 0.18), transparent 28%),
-                    radial-gradient(circle at top right, rgba(40, 114, 113, 0.18), transparent 24%),
-                    linear-gradient(180deg, var(--app-bg) 0%, color-mix(in srgb, var(--app-bg) 88%, #000 12%) 100%);
-                color: var(--ink);
-                font-family: "DM Sans", sans-serif;
-            }}
-
-            .block-container {{
-                max-width: 1340px;
-                padding-top: 1.8rem;
-                padding-bottom: 3rem;
-            }}
-
-            h1, h2, h3 {{
-                font-family: "Space Grotesk", sans-serif;
-                letter-spacing: -0.03em;
-                color: var(--ink);
-            }}
-
-            @keyframes rise {{
-                from {{
-                    opacity: 0;
-                    transform: translateY(10px);
+                :root {{
+                    {css_variables}
                 }}
-                to {{
-                    opacity: 1;
-                    transform: translateY(0);
+
+                .stApp {{
+                    background:
+                        radial-gradient(circle at top left, rgba(233, 196, 106, 0.18), transparent 28%),
+                        radial-gradient(circle at top right, rgba(40, 114, 113, 0.18), transparent 24%),
+                        linear-gradient(180deg, var(--app-bg) 0%, color-mix(in srgb, var(--app-bg) 88%, #000 12%) 100%);
+                    color: var(--ink);
+                    font-family: "DM Sans", sans-serif;
                 }}
-            }}
 
-            .hero, .metric-card, .surface-card, .alert-card {{
-                animation: rise 0.45s ease-out;
-            }}
+                .block-container {{
+                    max-width: 1340px;
+                    padding-top: 1.8rem;
+                    padding-bottom: 3rem;
+                }}
 
-            .auth-shell {{
-                max-width: 980px;
-                margin: 0 auto;
-                display: grid;
-                grid-template-columns: 1.1fr 0.9fr;
-                gap: 1rem;
-                align-items: stretch;
-            }}
+                h1, h2, h3 {{
+                    font-family: "Space Grotesk", sans-serif;
+                    letter-spacing: -0.03em;
+                    color: var(--ink);
+                }}
 
-            .auth-panel {{
-                padding: 1.6rem 1.7rem;
-                border-radius: 26px;
-                background: var(--paper);
-                border: 1px solid var(--line);
-                box-shadow: 0 22px 48px rgba(0, 0, 0, 0.1);
-            }}
+                @keyframes rise {{
+                    from {{
+                        opacity: 0;
+                        transform: translateY(10px);
+                    }}
+                    to {{
+                        opacity: 1;
+                        transform: translateY(0);
+                    }}
+                }}
 
-            .auth-lead {{
-                color: var(--muted);
-                max-width: 54ch;
-                margin-bottom: 1rem;
-            }}
+                .hero, .metric-card, .surface-card, .alert-card {{
+                    animation: rise 0.45s ease-out;
+                }}
 
-            .auth-kpi-grid {{
-                display: grid;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 0.75rem;
-                margin-top: 1.2rem;
-            }}
+                .auth-shell {{
+                    max-width: 980px;
+                    margin: 0 auto;
+                    display: grid;
+                    grid-template-columns: 1.1fr 0.9fr;
+                    gap: 1rem;
+                    align-items: stretch;
+                }}
 
-            .auth-kpi {{
-                padding: 0.9rem 1rem;
-                border-radius: 18px;
-                background: color-mix(in srgb, var(--paper-soft) 92%, var(--accent-soft) 8%);
-                border: 1px solid var(--line);
-            }}
+                .auth-panel {{
+                    padding: 1.6rem 1.7rem;
+                    border-radius: 26px;
+                    background: var(--paper);
+                    border: 1px solid var(--line);
+                    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.1);
+                }}
 
-            .auth-kpi strong {{
-                display: block;
-                font-family: "Space Grotesk", sans-serif;
-                font-size: 1.15rem;
-                color: var(--ink);
-            }}
+                .auth-lead {{
+                    color: var(--muted);
+                    max-width: 54ch;
+                    margin-bottom: 1rem;
+                }}
 
-            .auth-kpi span {{
-                font-size: 0.88rem;
-                color: var(--muted);
-            }}
+                .auth-kpi-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 0.75rem;
+                    margin-top: 1.2rem;
+                }}
 
-            .setup-note {{
-                padding: 1rem 1.1rem;
-                border-radius: 18px;
-                background: color-mix(in srgb, var(--paper-soft) 84%, var(--accent) 16%);
-                border: 1px solid var(--line);
-                color: var(--ink);
-            }}
+                .auth-kpi {{
+                    padding: 0.9rem 1rem;
+                    border-radius: 18px;
+                    background: color-mix(in srgb, var(--paper-soft) 92%, var(--accent-soft) 8%);
+                    border: 1px solid var(--line);
+                }}
 
-            .toolbar {{
-                display: flex;
-                justify-content: space-between;
-                gap: 1rem;
-                align-items: center;
-                margin: 0.2rem 0 1rem;
-                padding: 0.8rem 1rem;
-                border-radius: 18px;
-                background: color-mix(in srgb, var(--paper-soft) 92%, transparent);
-                border: 1px solid var(--line);
-            }}
+                .auth-kpi strong {{
+                    display: block;
+                    font-family: "Space Grotesk", sans-serif;
+                    font-size: 1.15rem;
+                    color: var(--ink);
+                }}
 
-            .toolbar-copy {{
-                color: var(--muted);
-                font-size: 0.92rem;
-            }}
+                .auth-kpi span {{
+                    font-size: 0.88rem;
+                    color: var(--muted);
+                }}
 
-            div[data-testid="stTextInput"] label p,
-            div[data-testid="stTextInput"] label,
-            div[data-testid="stTextInputRootElement"] label p,
-            div[data-testid="stTextInputRootElement"] label,
-            div[data-testid="stTextInput"] p,
-            div[data-testid="stTextInputRootElement"] p,
-            div[data-testid="stTextInput"] span,
-            div[data-testid="stTextInputRootElement"] span {{
-                color: var(--ink) !important;
-                opacity: 1 !important;
-                font-weight: 600;
-            }}
+                .setup-note {{
+                    padding: 1rem 1.1rem;
+                    border-radius: 18px;
+                    background: color-mix(in srgb, var(--paper-soft) 84%, var(--accent) 16%);
+                    border: 1px solid var(--line);
+                    color: var(--ink);
+                }}
 
-            div[data-testid="stButton"] button:disabled,
-            div[data-testid="stButton"] button:disabled p,
-            div[data-testid="stButton"] button:disabled span {{
-                color: var(--muted) !important;
-                opacity: 1 !important;
-            }}
+                .toolbar {{
+                    display: flex;
+                    justify-content: space-between;
+                    gap: 1rem;
+                    align-items: center;
+                    margin: 0.2rem 0 1rem;
+                    padding: 0.8rem 1rem;
+                    border-radius: 18px;
+                    background: color-mix(in srgb, var(--paper-soft) 92%, transparent);
+                    border: 1px solid var(--line);
+                }}
 
-            div[data-testid="stFormSubmitButton"] button {{
-                color: #fff8ef !important;
-                font-weight: 700;
-            }}
+                .toolbar-copy {{
+                    color: var(--muted);
+                    font-size: 0.92rem;
+                }}
 
-            .workspace-hero {{
-                margin: 0 0 1rem;
-                padding: 1.25rem 1.3rem;
-                border-radius: 24px;
-                background: linear-gradient(135deg, color-mix(in srgb, var(--paper) 82%, var(--teal) 18%), var(--paper));
-                border: 1px solid var(--line);
-                box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
-            }}
+                div[data-testid="stTextInput"] label p,
+                div[data-testid="stTextInput"] label,
+                div[data-testid="stTextInputRootElement"] label p,
+                div[data-testid="stTextInputRootElement"] label,
+                div[data-testid="stTextInput"] p,
+                div[data-testid="stTextInputRootElement"] p,
+                div[data-testid="stTextInput"] span,
+                div[data-testid="stTextInputRootElement"] span {{
+                    color: var(--ink) !important;
+                    opacity: 1 !important;
+                    font-weight: 600;
+                }}
 
-            .workspace-grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 0.8rem;
-                margin-top: 1rem;
-            }}
+                div[data-testid="stButton"] button:disabled,
+                div[data-testid="stButton"] button:disabled p,
+                div[data-testid="stButton"] button:disabled span {{
+                    color: var(--muted) !important;
+                    opacity: 1 !important;
+                }}
 
-            .workspace-card {{
-                padding: 0.95rem 1rem;
-                border-radius: 18px;
-                background: var(--paper);
-                border: 1px solid var(--line);
-                min-height: 132px;
-                box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
-            }}
+                div[data-testid="stFormSubmitButton"] button {{
+                    color: #fff8ef !important;
+                    font-weight: 700;
+                }}
 
-            .workspace-card.active {{
-                border-color: color-mix(in srgb, var(--accent) 56%, var(--line));
-                box-shadow: 0 16px 30px rgba(231, 111, 81, 0.14);
-            }}
+                .workspace-hero {{
+                    margin: 0 0 1rem;
+                    padding: 1.25rem 1.3rem;
+                    border-radius: 24px;
+                    background: linear-gradient(135deg, color-mix(in srgb, var(--paper) 82%, var(--teal) 18%), var(--paper));
+                    border: 1px solid var(--line);
+                    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
+                }}
 
-            .workspace-icon {{
-                width: 42px;
-                height: 42px;
-                border-radius: 14px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                font-family: "Space Grotesk", sans-serif;
-                font-size: 0.9rem;
-                letter-spacing: 0.06em;
-                background: linear-gradient(135deg, var(--accent), var(--accent-soft));
-                color: #fff8ef;
-                margin-bottom: 0.7rem;
-            }}
+                .workspace-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    gap: 0.8rem;
+                    margin-top: 1rem;
+                }}
 
-            .workspace-title {{
-                font-family: "Space Grotesk", sans-serif;
-                font-size: 1rem;
-                color: var(--ink);
-                margin-bottom: 0.25rem;
-            }}
+                .workspace-card {{
+                    padding: 0.95rem 1rem;
+                    border-radius: 18px;
+                    background: var(--paper);
+                    border: 1px solid var(--line);
+                    min-height: 132px;
+                    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+                }}
 
-            .workspace-copy {{
-                color: var(--muted);
-                font-size: 0.88rem;
-                line-height: 1.45;
-            }}
+                .workspace-card.active {{
+                    border-color: color-mix(in srgb, var(--accent) 56%, var(--line));
+                    box-shadow: 0 16px 30px rgba(231, 111, 81, 0.14);
+                }}
 
-            .hero {{
-                padding: 1.7rem 1.9rem;
-                border-radius: 28px;
-                background:
-                    linear-gradient(135deg, var(--hero-a), var(--hero-b)),
-                    linear-gradient(45deg, rgba(231, 111, 81, 0.12), transparent);
-                color: #fff8ef;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                box-shadow: 0 30px 60px rgba(0, 0, 0, 0.18);
-            }}
+                .workspace-icon {{
+                    width: 42px;
+                    height: 42px;
+                    border-radius: 14px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-family: "Space Grotesk", sans-serif;
+                    font-size: 0.9rem;
+                    letter-spacing: 0.06em;
+                    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+                    color: #fff8ef;
+                    margin-bottom: 0.7rem;
+                }}
 
-            .hero-kicker {{
-                text-transform: uppercase;
-                letter-spacing: 0.24em;
-                font-size: 0.74rem;
-                opacity: 0.72;
-                margin-bottom: 0.6rem;
-            }}
+                .workspace-title {{
+                    font-family: "Space Grotesk", sans-serif;
+                    font-size: 1rem;
+                    color: var(--ink);
+                    margin-bottom: 0.25rem;
+                }}
 
-            .hero-title {{
-                font-family: "Space Grotesk", sans-serif;
-                font-size: clamp(2.1rem, 5vw, 4rem);
-                line-height: 1.02;
-                margin: 0;
-                max-width: 15ch;
-            }}
+                .workspace-copy {{
+                    color: var(--muted);
+                    font-size: 0.88rem;
+                    line-height: 1.45;
+                }}
 
-            .hero-copy {{
-                margin-top: 1rem;
-                max-width: 64ch;
-                color: rgba(255, 248, 239, 0.88);
-                font-size: 1rem;
-            }}
+                .hero {{
+                    padding: 1.7rem 1.9rem;
+                    border-radius: 28px;
+                    background:
+                        linear-gradient(135deg, var(--hero-a), var(--hero-b)),
+                        linear-gradient(45deg, rgba(231, 111, 81, 0.12), transparent);
+                    color: #fff8ef;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.18);
+                }}
 
-            .hero-chip-row {{
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.65rem;
-                margin-top: 1.25rem;
-            }}
+                .hero-kicker {{
+                    text-transform: uppercase;
+                    letter-spacing: 0.24em;
+                    font-size: 0.74rem;
+                    opacity: 0.72;
+                    margin-bottom: 0.6rem;
+                }}
 
-            .hero-chip {{
-                padding: 0.45rem 0.8rem;
-                border-radius: 999px;
-                background: rgba(255, 255, 255, 0.12);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                font-size: 0.85rem;
-            }}
+                .hero-title {{
+                    font-family: "Space Grotesk", sans-serif;
+                    font-size: clamp(2.1rem, 5vw, 4rem);
+                    line-height: 1.02;
+                    margin: 0;
+                    max-width: 15ch;
+                }}
 
-            .status-grid {{
-                display: grid;
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 0.75rem;
-                margin-top: 1rem;
-            }}
+                .hero-copy {{
+                    margin-top: 1rem;
+                    max-width: 64ch;
+                    color: rgba(255, 248, 239, 0.88);
+                    font-size: 1rem;
+                }}
 
-            .status-tile {{
-                padding: 0.95rem 1rem;
-                border-radius: 18px;
-                background: var(--paper-soft);
-                border: 1px solid var(--line);
-            }}
+                .hero-chip-row {{
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.65rem;
+                    margin-top: 1.25rem;
+                }}
 
-            .status-label, .metric-label {{
-                color: var(--muted);
-                font-size: 0.82rem;
-                text-transform: uppercase;
-                letter-spacing: 0.12em;
-            }}
+                .hero-chip {{
+                    padding: 0.45rem 0.8rem;
+                    border-radius: 999px;
+                    background: rgba(255, 255, 255, 0.12);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    font-size: 0.85rem;
+                }}
 
-            .status-value {{
-                font-family: "Space Grotesk", sans-serif;
-                font-size: 1.25rem;
-                margin-top: 0.35rem;
-                color: var(--ink);
-            }}
+                .status-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: 0.75rem;
+                    margin-top: 1rem;
+                }}
 
-            .metric-card, .surface-card, .alert-card {{
-                background: var(--paper);
-                border-radius: 22px;
-                padding: 1rem 1.1rem;
-                border: 1px solid var(--line);
-                box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
-            }}
+                .status-tile {{
+                    padding: 0.95rem 1rem;
+                    border-radius: 18px;
+                    background: var(--paper-soft);
+                    border: 1px solid var(--line);
+                }}
 
-            .metric-card {{
-                min-height: 150px;
-            }}
+                .status-label, .metric-label {{
+                    color: var(--muted);
+                    font-size: 0.82rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.12em;
+                }}
 
-            .metric-value {{
-                font-family: "Space Grotesk", sans-serif;
-                font-size: 2rem;
-                color: var(--ink);
-                margin-top: 0.35rem;
-            }}
+                .status-value {{
+                    font-family: "Space Grotesk", sans-serif;
+                    font-size: 1.25rem;
+                    margin-top: 0.35rem;
+                    color: var(--ink);
+                }}
 
-            .metric-delta {{
-                margin-top: 0.6rem;
-                font-size: 0.92rem;
-                color: var(--teal);
-            }}
+                .metric-card, .surface-card, .alert-card {{
+                    background: var(--paper);
+                    border-radius: 22px;
+                    padding: 1rem 1.1rem;
+                    border: 1px solid var(--line);
+                    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
+                }}
 
-            .metric-note, .section-copy {{
-                color: var(--muted);
-                margin-top: 0.45rem;
-                font-size: 0.92rem;
-            }}
+                .metric-card {{
+                    min-height: 150px;
+                }}
 
-            .section-copy {{
-                max-width: 74ch;
-                margin-bottom: 1rem;
-            }}
+                .metric-value {{
+                    font-family: "Space Grotesk", sans-serif;
+                    font-size: 2rem;
+                    color: var(--ink);
+                    margin-top: 0.35rem;
+                }}
 
-            .surface-card {{
-                min-height: 100%;
-            }}
+                .metric-delta {{
+                    margin-top: 0.6rem;
+                    font-size: 0.92rem;
+                    color: var(--teal);
+                }}
 
-            .section-panel {{
-                background: var(--paper);
-                border: 1px solid var(--line);
-                border-radius: 22px;
-                padding: 1rem 1.1rem;
-                box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
-            }}
+                .metric-note, .section-copy {{
+                    color: var(--muted);
+                    margin-top: 0.45rem;
+                    font-size: 0.92rem;
+                }}
 
-            .mini-badge {{
-                display: inline-block;
-                padding: 0.2rem 0.55rem;
-                border-radius: 999px;
-                background: rgba(244, 162, 97, 0.16);
-                color: var(--accent);
-                font-size: 0.8rem;
-                margin-bottom: 0.7rem;
-            }}
+                .section-copy {{
+                    max-width: 74ch;
+                    margin-bottom: 1rem;
+                }}
 
-            .pipeline-grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 0.7rem;
-                margin-top: 0.8rem;
-            }}
+                .surface-card {{
+                    min-height: 100%;
+                }}
 
-            .pipeline-stage {{
-                background: var(--paper);
-                border: 1px solid var(--line);
-                border-radius: 18px;
-                padding: 0.85rem;
-                min-height: 110px;
-            }}
+                .section-panel {{
+                    background: var(--paper);
+                    border: 1px solid var(--line);
+                    border-radius: 22px;
+                    padding: 1rem 1.1rem;
+                    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
+                }}
 
-            .pipeline-index {{
-                width: 34px;
-                height: 34px;
-                border-radius: 999px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                background: linear-gradient(135deg, var(--accent), var(--accent-soft));
-                color: #fff;
-                font-family: "Space Grotesk", sans-serif;
-                margin-bottom: 0.6rem;
-            }}
+                .mini-badge {{
+                    display: inline-block;
+                    padding: 0.2rem 0.55rem;
+                    border-radius: 999px;
+                    background: rgba(244, 162, 97, 0.16);
+                    color: var(--accent);
+                    font-size: 0.8rem;
+                    margin-bottom: 0.7rem;
+                }}
 
-            .pipeline-name {{
-                font-family: "Space Grotesk", sans-serif;
-                font-size: 1rem;
-                margin-bottom: 0.3rem;
-                color: var(--ink);
-            }}
+                .pipeline-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                    gap: 0.7rem;
+                    margin-top: 0.8rem;
+                }}
 
-            .pipeline-copy {{
-                color: var(--muted);
-                font-size: 0.88rem;
-                line-height: 1.35;
-            }}
+                .pipeline-stage {{
+                    background: var(--paper);
+                    border: 1px solid var(--line);
+                    border-radius: 18px;
+                    padding: 0.85rem;
+                    min-height: 110px;
+                }}
 
-            .health-ring {{
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 186px;
-                height: 186px;
-                margin: 0 auto 0.8rem;
-                border-radius: 50%;
-                background: conic-gradient(var(--teal) calc(var(--score) * 1%), rgba(148, 163, 163, 0.18) 0);
-                position: relative;
-            }}
+                .pipeline-index {{
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 999px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+                    color: #fff;
+                    font-family: "Space Grotesk", sans-serif;
+                    margin-bottom: 0.6rem;
+                }}
 
-            .health-ring::after {{
-                content: "";
-                position: absolute;
-                width: 138px;
-                height: 138px;
-                border-radius: 50%;
-                background: color-mix(in srgb, var(--paper) 92%, transparent);
-                box-shadow: inset 0 0 0 1px var(--line);
-            }}
+                .pipeline-name {{
+                    font-family: "Space Grotesk", sans-serif;
+                    font-size: 1rem;
+                    margin-bottom: 0.3rem;
+                    color: var(--ink);
+                }}
 
-            .health-ring-value {{
-                position: relative;
-                z-index: 1;
-                text-align: center;
-                color: var(--ink);
-            }}
+                .pipeline-copy {{
+                    color: var(--muted);
+                    font-size: 0.88rem;
+                    line-height: 1.35;
+                }}
 
-            .health-ring-number {{
-                font-family: "Space Grotesk", sans-serif;
-                font-size: 2.8rem;
-                line-height: 1;
-            }}
+                .health-ring {{
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 186px;
+                    height: 186px;
+                    margin: 0 auto 0.8rem;
+                    border-radius: 50%;
+                    background: conic-gradient(var(--teal) calc(var(--score) * 1%), rgba(148, 163, 163, 0.18) 0);
+                    position: relative;
+                }}
 
-            .alert-card {{
-                min-height: 158px;
-                background: linear-gradient(180deg, var(--paper), color-mix(in srgb, var(--paper) 84%, var(--accent-soft) 16%));
-            }}
+                .health-ring::after {{
+                    content: "";
+                    position: absolute;
+                    width: 138px;
+                    height: 138px;
+                    border-radius: 50%;
+                    background: color-mix(in srgb, var(--paper) 92%, transparent);
+                    box-shadow: inset 0 0 0 1px var(--line);
+                }}
 
-            .priority-pill {{
-                display: inline-block;
-                padding: 0.22rem 0.55rem;
-                border-radius: 999px;
-                background: rgba(40, 114, 113, 0.12);
-                color: var(--teal);
-                font-size: 0.8rem;
-                margin-bottom: 0.7rem;
-            }}
+                .health-ring-value {{
+                    position: relative;
+                    z-index: 1;
+                    text-align: center;
+                    color: var(--ink);
+                }}
 
-            div[data-testid="stDataFrame"] {{
-                border: 1px solid var(--line);
-                border-radius: 18px;
-                overflow: hidden;
-            }}
-        </style>
-        """,
+                .health-ring-number {{
+                    font-family: "Space Grotesk", sans-serif;
+                    font-size: 2.8rem;
+                    line-height: 1;
+                }}
+
+                .alert-card {{
+                    min-height: 158px;
+                    background: linear-gradient(180deg, var(--paper), color-mix(in srgb, var(--paper) 84%, var(--accent-soft) 16%));
+                }}
+
+                .priority-pill {{
+                    display: inline-block;
+                    padding: 0.22rem 0.55rem;
+                    border-radius: 999px;
+                    background: rgba(40, 114, 113, 0.12);
+                    color: var(--teal);
+                    font-size: 0.8rem;
+                    margin-bottom: 0.7rem;
+                }}
+
+                div[data-testid="stDataFrame"] {{
+                    border: 1px solid var(--line);
+                    border-radius: 18px;
+                    overflow: hidden;
+                }}
+            </style>
+            """
+        ).strip(),
         unsafe_allow_html=True,
     )
 
@@ -564,7 +564,9 @@ def format_count(value: float, market_view: str = "India") -> str:
     return f"{int(value):,}"
 
 
+@st.cache_data(ttl=3600)
 def load_artifacts(source: Any):
+    """Load and process retail data with caching to reduce loading time."""
     return run_retail_intelligence(source)
 
 
@@ -597,80 +599,48 @@ def _streamlit_identity() -> Any:
     return getattr(st, "user", getattr(st, "experimental_user", None))
 
 
-def _streamlit_login(provider: str) -> None:
-    if hasattr(st, "login"):
-        st.login(provider)
-        return
-    if hasattr(st, "experimental_login"):
-        st.experimental_login(provider)
-        return
-    raise RuntimeError("This Streamlit version does not support native login.")
-
-
-def _streamlit_logout() -> None:
-    if hasattr(st, "logout"):
-        st.logout()
-        return
-    if hasattr(st, "experimental_logout"):
-        st.experimental_logout()
-        return
-
-
-def _hydrate_google_session(access_config) -> bool:
-    identity = _streamlit_identity()
-    if identity is None or not getattr(identity, "is_logged_in", False):
-        return False
-
-    google_user = build_google_user(identity, access_config)
-    if google_user is None:
-        return False
-
-    st.session_state["auth_status"] = True
-    st.session_state["auth_user"] = google_user.username
-    st.session_state["auth_name"] = google_user.name
-    st.session_state["auth_role"] = google_user.role
-    st.session_state["auth_source"] = google_user.auth_source
-    return True
-
-
 def _render_auth_setup(theme: str) -> None:
     inject_styles(theme)
     left, right = st.columns([1.15, 0.9], gap="large")
     with left:
         st.markdown(
-            """
-            <section class="hero">
-                <div class="hero-kicker">RetailOS secure access</div>
-                <h1 class="hero-title">Authentication is required before analytics can be opened.</h1>
-                <p class="hero-copy">
-                    The dashboard is now protected by credential-based access. Configure one admin user in Streamlit
-                    secrets or environment variables, then sign in normally.
-                </p>
-                <div class="hero-chip-row">
-                    <span class="hero-chip">Session-based login</span>
-                    <span class="hero-chip">Password hash supported</span>
-                    <span class="hero-chip">Logout control enabled</span>
-                </div>
-            </section>
-            """,
+            dedent(
+                """
+                <section class="hero">
+                    <div class="hero-kicker">RetailOS secure access</div>
+                    <h1 class="hero-title">Authentication is required before analytics can be opened.</h1>
+                    <p class="hero-copy">
+                        The dashboard is now protected by credential-based access. Configure one admin user in Streamlit
+                        secrets or environment variables, then sign in normally.
+                    </p>
+                    <div class="hero-chip-row">
+                        <span class="hero-chip">Session-based login</span>
+                        <span class="hero-chip">Password hash supported</span>
+                        <span class="hero-chip">Logout control enabled</span>
+                    </div>
+                </section>
+                """
+            ).strip(),
             unsafe_allow_html=True,
         )
     with right:
         st.markdown(
-            """
-            <section class="auth-panel">
-                <div class="mini-badge">Setup required</div>
-                <h3>Configure one admin account</h3>
-                <p class="auth-lead">
-                    RetailOS did not find auth credentials yet, so the app is refusing open access.
-                    This is the safer default for deployment.
-                </p>
-                <div class="setup-note">
-                    Add either <code>st.secrets["auth"]</code> or environment variables for
-                    <code>RETAILOS_AUTH_USERNAME</code> with a password or password hash.
-                </div>
-            </section>
-            """,
+            dedent(
+                """
+                <section class="auth-panel">
+                    <div class="mini-badge">Setup required</div>
+                    <h3>Configure one admin account</h3>
+                    <p class="auth-lead">
+                        RetailOS did not find auth credentials yet, so the app is refusing open access.
+                        This is the safer default for deployment.
+                    </p>
+                    <div class="setup-note">
+                        Add either <code>st.secrets["auth"]</code> or environment variables for
+                        <code>RETAILOS_AUTH_USERNAME</code> with a password or password hash.
+                    </div>
+                </section>
+                """
+            ).strip(),
             unsafe_allow_html=True,
         )
     st.code(
@@ -678,57 +648,26 @@ def _render_auth_setup(theme: str) -> None:
             """
             # .streamlit/secrets.toml
             [auth]
-            redirect_uri = "http://localhost:8501/oauth2callback"
-            cookie_secret = "replace-with-a-long-random-string"
-
-            [auth.google]
-            client_id = "your-google-client-id"
-            client_secret = "your-google-client-secret"
-            server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
-
-            [access]
-
-            [[access.users]]
             username = "admin"
-            name = "Retail Admin"
-            role = "admin"
             password = "ChangeMeNow123"
-
-            [[access.users]]
-            username = "analyst"
-            name = "Operations Analyst"
-            role = "analyst"
-            password = "Analyse123"
-
-            [[access.users]]
-            username = "viewer"
-            name = "Business Viewer"
-            role = "viewer"
-            password = "Viewer123"
-
-            [access.google_roles]
-            admin = ["admin@example.com"]
-            analyst = ["analyst@example.com"]
-            viewer = ["viewer@example.com"]
+            
+            # Or use password hash for production:
+            # password_hash = "pbkdf2_sha256$390000$salt$hash"
             """
         ).strip(),
         language="toml",
     )
     st.info(
-        "For deployment, prefer `password_hash` instead of a plain password. "
-        "Google Sign-In uses Streamlit's native OIDC flow, while local users remain available as a fallback."
+        "For production, use `password_hash` instead of plain password. "
+        "See documentation for generating secure password hashes."
     )
 
 
 def require_authentication(theme: str) -> None:
     _ensure_auth_state()
     access_config = load_access_config(st.secrets)
-    google_enabled = google_auth_available(st.secrets)
 
-    if _hydrate_google_session(access_config):
-        return
-
-    if access_config is None and not google_enabled:
+    if access_config is None:
         _render_auth_setup(theme)
         st.stop()
 
@@ -736,68 +675,58 @@ def require_authentication(theme: str) -> None:
         return
 
     inject_styles(theme)
-    auth_copy = (
-        "Use Google Sign-In when available, or continue with your assigned RetailOS account."
-        if google_enabled
-        else "Use your assigned RetailOS account to continue."
-    )
     left, right = st.columns([1.15, 0.9], gap="large")
     with left:
         st.markdown(
-            """
-            <section class="hero">
-                <div class="hero-kicker">RetailOS secure retail command centre</div>
-                <h1 class="hero-title">Protected access for operators, analysts, and decision makers.</h1>
-                <p class="hero-copy">
-                    Sign in to open customer segmentation, demand forecasting, anomaly detection,
-                    health scoring, and recommendation workflows in one secure workspace.
-                </p>
-                <div class="auth-kpi-grid">
-                    <div class="auth-kpi">
-                        <strong>Secure sign-in</strong>
-                        <span>Google Sign-In plus fallback credentials for the dashboard</span>
+            dedent(
+                """
+                <section class="hero">
+                    <div class="hero-kicker">RetailOS secure retail command centre</div>
+                    <h1 class="hero-title">Protected access for operators, analysts, and decision makers.</h1>
+                    <p class="hero-copy">
+                        Sign in to open customer segmentation, demand forecasting, anomaly detection,
+                        health scoring, and recommendation workflows in one secure workspace.
+                    </p>
+                    <div class="auth-kpi-grid">
+                        <div class="auth-kpi">
+                            <strong>Secure sign-in</strong>
+                            <span>Username and password authentication for the dashboard</span>
+                        </div>
+                        <div class="auth-kpi">
+                            <strong>Multi-user access</strong>
+                            <span>Admins, analysts, and viewers can each have separate credentials</span>
+                        </div>
+                        <div class="auth-kpi">
+                            <strong>India-ready reporting</strong>
+                            <span>IST timestamps and lakh/crore presentation remain available after login</span>
+                        </div>
+                        <div class="auth-kpi">
+                            <strong>Role-based controls</strong>
+                            <span>Uploads and downloads can be restricted based on user responsibility</span>
+                        </div>
                     </div>
-                    <div class="auth-kpi">
-                        <strong>Multi-user access</strong>
-                        <span>Admins, analysts, and viewers can each have separate credentials</span>
-                    </div>
-                    <div class="auth-kpi">
-                        <strong>India-ready reporting</strong>
-                        <span>IST timestamps and lakh/crore presentation remain available after login</span>
-                    </div>
-                    <div class="auth-kpi">
-                        <strong>Role-based controls</strong>
-                        <span>Uploads and downloads can be restricted based on user responsibility</span>
-                    </div>
-                </div>
-            </section>
-            """,
+                </section>
+                """
+            ).strip(),
             unsafe_allow_html=True,
         )
     with right:
         st.markdown(
-            f"""
-            <section class="auth-panel">
-                <div class="mini-badge">Login</div>
-                <h3>RetailOS authentication</h3>
-                <p class="auth-lead">{auth_copy}</p>
-            </section>
-            """,
+            dedent(
+                """
+                <section class="auth-panel">
+                    <div class="mini-badge">Sign In</div>
+                    <h3>RetailOS authentication</h3>
+                    <p class="auth-lead">Use your credentials to access the dashboard</p>
+                </section>
+                """
+            ).strip(),
             unsafe_allow_html=True,
         )
-        if google_enabled:
-            if st.button("Continue with Google", use_container_width=True, type="primary"):
-                _streamlit_login("google")
-            st.caption("Google accounts are mapped to Admin, Analyst, or Viewer access using configured email rules.")
-        else:
-            if st.button("Continue with Google", use_container_width=True):
-                st.info("Google Sign-In is part of RetailOS, but this deployment is not configured for Google OAuth yet.")
-            st.caption("Google Sign-In is available in RetailOS but is not configured for this deployment yet.")
-        st.markdown("---")
         with st.form("retailos_login_form", clear_on_submit=False):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Sign in with RetailOS account", use_container_width=True)
+            username = st.text_input("Username", help="Enter your username")
+            password = st.text_input("Password", type="password", help="Enter your password")
+            submitted = st.form_submit_button("Sign In", use_container_width=True)
 
     if submitted:
         authenticated_user = authenticate_local_user(username.strip(), password, access_config)
@@ -806,11 +735,11 @@ def require_authentication(theme: str) -> None:
             st.session_state["auth_user"] = authenticated_user.username
             st.session_state["auth_name"] = authenticated_user.name
             st.session_state["auth_role"] = authenticated_user.role
-            st.session_state["auth_source"] = authenticated_user.auth_source
+            st.session_state["auth_source"] = "local"
             st.success("Login successful. Opening RetailOS.")
             st.rerun()
         else:
-            st.error("The username or password is incorrect.")
+            st.error("Invalid username or password. Please try again.")
 
     st.stop()
 
@@ -823,8 +752,6 @@ def configure_runtime_controls():
     st.sidebar.caption(f"Role: {_role_label()}")
     st.sidebar.caption(f"Auth: {st.session_state.get('auth_source', 'local').capitalize()}")
     if st.sidebar.button("Logout", use_container_width=True):
-        if st.session_state.get("auth_source") == "google":
-            _streamlit_logout()
         st.session_state["auth_status"] = False
         st.session_state["auth_user"] = ""
         st.session_state["auth_name"] = ""
@@ -914,28 +841,32 @@ def render_workspace_hero(page_name: str) -> None:
     for icon, title, copy in sections:
         active_class = " active" if title == page_name else ""
         cards_markup.append(
-            f"""
-            <div class="workspace-card{active_class}">
-                <div class="workspace-icon">{icon}</div>
-                <div class="workspace-title">{title}</div>
-                <div class="workspace-copy">{copy}</div>
-            </div>
-            """
+            dedent(
+                f"""
+                <div class="workspace-card{active_class}">
+                    <div class="workspace-icon">{icon}</div>
+                    <div class="workspace-title">{title}</div>
+                    <div class="workspace-copy">{copy}</div>
+                </div>
+                """
+            ).strip()
         )
 
     st.markdown(
-        f"""
-        <section class="workspace-hero">
-            <div class="hero-kicker">RetailOS workspace navigator</div>
-            <h2 style="margin:0;">Analyse your retail data page by page.</h2>
-            <p class="section-copy" style="margin-top:0.7rem; margin-bottom:0;">
-                Use the sidebar page switch to move between business views. The highlighted card shows the current workspace section.
-            </p>
-            <div class="workspace-grid">
-                {''.join(cards_markup)}
-            </div>
-        </section>
-        """,
+        dedent(
+            f"""
+            <section class="workspace-hero">
+                <div class="hero-kicker">RetailOS workspace navigator</div>
+                <h2 style="margin:0;">Analyse your retail data page by page.</h2>
+                <p class="section-copy" style="margin-top:0.7rem; margin-bottom:0;">
+                    Use the sidebar page switch to move between business views. The highlighted card shows the current workspace section.
+                </p>
+                <div class="workspace-grid">
+                    {''.join(cards_markup)}
+                </div>
+            </section>
+            """
+        ).strip(),
         unsafe_allow_html=True,
     )
 
@@ -1008,7 +939,9 @@ def _segment_summary_from_features(customer_features: pd.DataFrame) -> pd.DataFr
     )
 
 
+@st.cache_data
 def build_filtered_view(artifacts, controls):
+    """Build filtered view with caching for improved dashboard performance."""
     if isinstance(controls["selected_dates"], tuple) and len(controls["selected_dates"]) == 2:
         start_date, end_date = controls["selected_dates"]
     else:
@@ -1115,33 +1048,35 @@ def render_header(artifacts, view) -> None:
         else "N/A"
     )
     st.markdown(
-        f"""
-        <section class="hero">
-            <div class="hero-kicker">{hero_kicker}</div>
-            <h1 class="hero-title">{hero_title}</h1>
-            <p class="hero-copy">{hero_copy}</p>
-            <div class="hero-chip-row">
-                <span class="hero-chip">{format_count(view['kpis']['total_customers'], market_view)} active customers</span>
-                <span class="hero-chip">{format_count(view['kpis']['total_orders'], market_view)} completed orders</span>
-                <span class="hero-chip">{len(view['anomalies'])} live alerts</span>
-                <span class="hero-chip">Forecast RMSE {rmse_text}</span>
-            </div>
-            <div class="status-grid">
-                <div class="status-tile">
-                    <div class="status-label">System status</div>
-                    <div class="status-value">{view['health_status']}</div>
+        dedent(
+            f"""
+            <section class="hero">
+                <div class="hero-kicker">{hero_kicker}</div>
+                <h1 class="hero-title">{hero_title}</h1>
+                <p class="hero-copy">{hero_copy}</p>
+                <div class="hero-chip-row">
+                    <span class="hero-chip">{format_count(view['kpis']['total_customers'], market_view)} active customers</span>
+                    <span class="hero-chip">{format_count(view['kpis']['total_orders'], market_view)} completed orders</span>
+                    <span class="hero-chip">{len(view['anomalies'])} live alerts</span>
+                    <span class="hero-chip">Forecast RMSE {rmse_text}</span>
                 </div>
-                <div class="status-tile">
-                    <div class="status-label">Last update</div>
-                    <div class="status-value">{refreshed_text}</div>
+                <div class="status-grid">
+                    <div class="status-tile">
+                        <div class="status-label">System status</div>
+                        <div class="status-value">{view['health_status']}</div>
+                    </div>
+                    <div class="status-tile">
+                        <div class="status-label">Last update</div>
+                        <div class="status-value">{refreshed_text}</div>
+                    </div>
+                    <div class="status-tile">
+                        <div class="status-label">Retail health score</div>
+                        <div class="status-value">{view['health_score']}/100</div>
+                    </div>
                 </div>
-                <div class="status-tile">
-                    <div class="status-label">Retail health score</div>
-                    <div class="status-value">{view['health_score']}/100</div>
-                </div>
-            </div>
-        </section>
-        """,
+            </section>
+            """
+        ).strip(),
         unsafe_allow_html=True,
     )
 
@@ -1160,14 +1095,16 @@ def render_metric_cards(view) -> None:
     for column, (label, value, delta, note) in zip(columns, cards):
         with column:
             st.markdown(
-                f"""
-                <div class="metric-card">
-                    <div class="metric-label">{label}</div>
-                    <div class="metric-value">{value}</div>
-                    <div class="metric-delta">{delta}</div>
-                    <div class="metric-note">{note}</div>
-                </div>
-                """,
+                dedent(
+                    f"""
+                    <div class="metric-card">
+                        <div class="metric-label">{label}</div>
+                        <div class="metric-value">{value}</div>
+                        <div class="metric-delta">{delta}</div>
+                        <div class="metric-note">{note}</div>
+                    </div>
+                    """
+                ).strip(),
                 unsafe_allow_html=True,
             )
 
@@ -1195,13 +1132,15 @@ def render_pipeline() -> None:
         for offset, (name, description) in enumerate(cards[start : start + 3]):
             with columns[offset]:
                 st.markdown(
-                    f"""
-                    <div class="pipeline-stage">
-                        <div class="pipeline-index">{start + offset + 1}</div>
-                        <div class="pipeline-name">{name}</div>
-                        <div class="pipeline-copy">{description}</div>
-                    </div>
-                    """,
+                    dedent(
+                        f"""
+                        <div class="pipeline-stage">
+                            <div class="pipeline-index">{start + offset + 1}</div>
+                            <div class="pipeline-name">{name}</div>
+                            <div class="pipeline-copy">{description}</div>
+                        </div>
+                        """
+                    ).strip(),
                     unsafe_allow_html=True,
                 )
 
@@ -1293,12 +1232,14 @@ def render_quick_csv_summary(artifacts, view) -> None:
     for column, (label, value) in zip(summary_cols, summary_cards):
         with column:
             st.markdown(
-                f"""
-                <div class="metric-card">
-                    <div class="metric-label">{label}</div>
-                    <div class="metric-value">{value}</div>
-                </div>
-                """,
+                dedent(
+                    f"""
+                    <div class="metric-card">
+                        <div class="metric-label">{label}</div>
+                        <div class="metric-value">{value}</div>
+                    </div>
+                    """
+                ).strip(),
                 unsafe_allow_html=True,
             )
 
@@ -1644,13 +1585,15 @@ def render_funnel_and_alerts(view) -> None:
         for index, recommendation in enumerate(view["recommendations"]):
             with recommendation_columns[index % 2]:
                 st.markdown(
-                    f"""
-                    <div class="alert-card">
-                        <div class="priority-pill">{recommendation['priority']} priority</div>
-                        <h3>{recommendation['title']}</h3>
-                        <p class="section-copy">{recommendation['action']}</p>
-                    </div>
-                    """,
+                    dedent(
+                        f"""
+                        <div class="alert-card">
+                            <div class="priority-pill">{recommendation['priority']} priority</div>
+                            <h3>{recommendation['title']}</h3>
+                            <p class="section-copy">{recommendation['action']}</p>
+                        </div>
+                        """
+                    ).strip(),
                     unsafe_allow_html=True,
                 )
 
@@ -1666,14 +1609,16 @@ def render_health_and_geography(view) -> None:
             unsafe_allow_html=True,
         )
         st.markdown(
-            f"""
-            <div class="health-ring" style="--score:{view['health_score']};">
-                <div class="health-ring-value">
-                    <div class="health-ring-number">{view['health_score']}</div>
-                    <div>{view['health_status']}</div>
+            dedent(
+                f"""
+                <div class="health-ring" style="--score:{view['health_score']};">
+                    <div class="health-ring-value">
+                        <div class="health-ring-number">{view['health_score']}</div>
+                        <div>{view['health_status']}</div>
+                    </div>
                 </div>
-            </div>
-            """,
+                """
+            ).strip(),
             unsafe_allow_html=True,
         )
         health_table = view["health_components"].copy()
